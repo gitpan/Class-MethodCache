@@ -5,6 +5,7 @@
 #undef PERL_CORE
 #include "XSUB.h"
 
+#define NEED_sv_2pv_flags
 #include "ppport.h"
 
 #ifdef HvMROMETA
@@ -22,6 +23,7 @@ STATIC GV *sv_gv(SV *sv) {
 			return (GV *)sv;
 		} else if ( SvPOK(sv) ) {
 			/* fully qualified name case */
+			/* OMIGAWD XMATH UR TEH GREATES KTHX FR RITING THIS!!! COPYRAIT */
 			GV** gvp;
 			char *s, *end = NULL, saved;
 			char *name = SvPV_nolen(sv);
@@ -112,7 +114,7 @@ delete_cv (sv)
 	CODE:
 		if ( GvCV(gv) )
 			SvREFCNT_dec(GvCV(gv));
-		GvCV(gv) = Nullcv;
+		GvCV(gv) = NULL;
 		GvCVGEN(gv) = 0;
 
 SV *
@@ -128,13 +130,17 @@ get_cached_method (sv)
 			XPUSHs(&PL_sv_undef);
 
 void
-set_cached_method (sv, cv)
+set_cached_method (sv, cv_sv)
 	INPUT:
 		SV *sv
-		CV *cv
+		SV *cv_sv
 	PREINIT:
 		GV *gv = sv_gv(sv);
+		CV *cv = SvROK(cv_sv) ? (CV *)SvRV(cv_sv) : NULL;
 	CODE:
+		if ( !cv || SvTYPE(cv) != SVt_PVCV )
+			Perl_croak(aTHX_ "cv is not a code reference");
+
 		if ( GvREFCNT(gv) == 1 ) {
 			if ( GvCV(gv) ) {
 				if ( GvCVGEN(gv) == 0 )
@@ -170,7 +176,7 @@ set_cv (sv, cv_sv)
 		GV *gv = sv_gv(sv);
 	PPCODE:
 		if ( !SvOK(cv_sv) ) {
-			cv = Nullcv;
+			cv = NULL;
 		} else if ( SvROK(cv_sv) && SvTYPE(SvRV(cv_sv)) == SVt_PVCV ) {
 			cv = (CV *)SvRV(cv_sv);
 			SvREFCNT_inc(cv);
